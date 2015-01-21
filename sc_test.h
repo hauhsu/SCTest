@@ -12,16 +12,24 @@ namespace sc_test
 #define FAIL false
 
 #define SC_TEST(func) \
-  m_tests.insert(std::pair<std::string, std::function<void()> > \
+  m_tests.push_back(std::pair<std::string, std::function<void()> > \
       ( #func, [=]{ return this->func(); } ) );
 
-#define ASSERT_EQ(val1, val2) if(val1 != val2) m_test_result = FAIL;
+#define ASSERT_EQ(val1, val2) if((val1) != (val2)) m_test_result = FAIL;
 
 #define EXPECT_DELAY(operation, time, unit) \
   sc_core::sc_time __tmp = sc_core::sc_time_stamp();\
   (operation);\
-  if (sc_core::sc_time_stamp() - __tmp != sc_core::sc_time(time, unit)) \
+  if (sc_core::sc_time_stamp() - __tmp != sc_core::sc_time((time), (unit))) \
     m_test_result = FAIL;
+
+#define EXPECT_EXCEPTION(operation, exception_type) \
+  try { \
+    (operation); \
+  } catch (exception_type) {\
+    ;\
+  }
+
 
 
 
@@ -69,7 +77,7 @@ public:
   }
 
 protected:
-  std::map <std::string, std::function<void ()>> m_tests;
+  std::vector< std::pair< std::string, std::function<void ()> > > m_tests;
   std::vector <std::string> m_passed_tests, m_failed_tests;
   bool m_test_result;
 };
