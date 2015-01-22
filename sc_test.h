@@ -3,8 +3,10 @@
 
 #include <map>
 #include <string>
-#include <systemc>
 #include <algorithm>
+
+#define SC_INCLUDE_DYNAMIC_PROCESSES
+#include <systemc>
 
 namespace sc_test
 {
@@ -106,8 +108,8 @@ public:
       reset(); 
       ::std::cout << "Testing: " << test.name<< "...";
 
-      //::sc_core::sc_process_handle h = ::sc_core::sc_spawn(sc_bind(&test.second));
-      test.run();
+      ::sc_core::sc_process_handle h = ::sc_core::sc_spawn(sc_bind(test.func));
+      wait(h.terminated_event());
 
       if (test.result == PASSED) {
         ::std::cout << "  PASSED!" << ::std::endl;
