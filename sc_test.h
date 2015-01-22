@@ -118,6 +118,10 @@ public:
     SC_THREAD(run_tests); 
   }
 
+  ~sc_testbench() {
+    analysis();
+  }
+
   virtual void reset() = 0;
 
   void run_tests() {
@@ -158,6 +162,8 @@ public:
     ::std::cout << "Failed tests (" << m_test_list.num_failed() << "): " << ::std::endl;
     m_test_list.print_test_with_result(FAILED);
   }
+
+
 
 protected:
   void set_fail(::std::string func_name) {
