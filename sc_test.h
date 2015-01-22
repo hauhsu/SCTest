@@ -4,82 +4,144 @@
 #include <map>
 #include <string>
 #include <systemc>
+#include <algorithm>
 
 namespace sc_test
 {
 
-#define PASS true
-#define FAIL false
+enum result {UNKNOWN, PASSED, FAILED};
 
-#define SC_TEST(func) \
-  m_tests.push_back(std::pair<std::string, std::function<void()> > \
-      ( #func, [=]{ return this->func(); } ) );
+#define SC_TEST(func) {\
+  sc_test::test_helper __t(#func, [=]{ return this->func(); }, sc_test::PASSED); \
+  m_test_list.list.push_back(__t);}
 
-#define ASSERT_EQ(val1, val2) if((val1) != (val2)) m_test_result = FAIL;
+#define ASSERT_EQ(val1, val2) if((val1) != (val2)) set_fail(__func__);
 
 #define EXPECT_DELAY(operation, time, unit) \
-  sc_core::sc_time __tmp = sc_core::sc_time_stamp();\
+  ::sc_core::sc_time __tmp = ::sc_core::sc_time_stamp();\
   (operation);\
-  if (sc_core::sc_time_stamp() - __tmp != sc_core::sc_time((time), (unit))) \
-    m_test_result = FAIL;
+  if (::sc_core::sc_time_stamp() - __tmp != ::sc_core::sc_time((time), (unit))) \
+    set_fail(__func__);
 
 #define EXPECT_EXCEPTION(operation, exception_type) \
   try { \
     (operation); \
+    set_fail(__func__); \
   } catch (exception_type) {\
     ;\
   }
 
+struct test_helper {
+  test_helper(::std::string n, ::std::function <void ()> f, result r):
+    name(n), 
+    func(f), 
+    result(r)
+  {;}
+
+  void run() {
+    func();
+  }
+
+  ::std::string name;
+  ::std::function <void ()> func;
+  result result;
+};
+
+struct test_list {
+
+  test_helper& operator[](::std::string const test_name) {
+    auto it = find_if( begin(list), end(list), 
+        [&](test_helper test){ 
+          return test.name == test_name;
+        });
+    return *it;
+  }
+
+  size_t num_passed() {
+    return count_if(begin(list), end(list), [&](test_helper test) {
+          return test.result == PASSED; 
+        });
+  }
+
+  size_t num_failed() {
+    return count_if(begin(list), end(list), [&](test_helper test) {
+          return test.result == FAILED; 
+        });
+  }
+
+  size_t num_total() {
+    return list.size();  
+  }
+
+  void print_test_with_result(const result r) {
+    for (auto test: list) {
+      if (test.result == r) {
+        ::std::cout << ::std::string("    ") << test.name << ::std::endl;
+      }
+    }
+  }
+
+  ::std::vector <test_helper> list;
+
+};
 
 
 
 
-class sc_testbench: sc_core::sc_module
+
+class sc_testbench: ::sc_core::sc_module
 {
 public:
-  sc_testbench(sc_core::sc_module_name name):
-    sc_core::sc_module(name)
+  sc_testbench(::sc_core::sc_module_name name):
+    ::sc_core::sc_module(name)
   {
     SC_HAS_PROCESS(sc_testbench);
     SC_THREAD(run_tests); 
   }
 
+  virtual void reset() = 0;
+
   void run_tests() {
-    for (auto test: m_tests) {
-      std::cout << "Testing: " << test.first << "...";
+    for (auto test: m_test_list.list) {
+      reset(); 
+      ::std::cout << "Testing: " << test.name<< "...";
 
-      m_test_result = PASS;
-      test.second();
+      //::sc_core::sc_process_handle h = ::sc_core::sc_spawn(sc_bind(&test.second));
+      test.run();
 
-      if (m_test_result == PASS) {
-        std::cout << "  PASSED!" << std::endl;
-        m_passed_tests.push_back(test.first);
+      if (test.result == PASSED) {
+        ::std::cout << "  PASSED!" << ::std::endl;
       }
+
+      else if( test.result == FAILED) {
+        ::std::cout << "  FAILED..." << ::std::endl;
+      }
+
       else {
-        std::cout << "  FAILED..." << std::endl;
-        m_failed_tests.push_back(test.first);
+        ::std::cout << "  Some problem occures..." << ::std::endl;
       }
     }
     analysis();
   }
 
   void analysis() {
-    std::cout << "Total number of tests: " << m_tests.size() << std::endl;
-    std::cout << "Passed tests (" << m_passed_tests.size() << "): " << std::endl;
-    for (auto passed_test_name: m_passed_tests) {
-      std::cout << std::string("    ") << passed_test_name << std::endl;
-    }
+    ::std::cout << ::std::endl;
+    ::std::cout << "Total number of tests: " << m_test_list.num_total() << ::std::endl;
+    ::std::cout << "Passed tests (" << m_test_list.num_passed() << "): " << ::std::endl;
+    m_test_list.print_test_with_result(PASSED);
 
-    std::cout << "Failed tests (" << m_failed_tests.size() << "): " << std::endl;
-    for (auto failed_test_name: m_failed_tests) {
-      std::cout << std::string("    ") << failed_test_name << std::endl;
-    }
+    ::std::cout << ::std::endl;
+    ::std::cout << "Failed tests (" << m_test_list.num_failed() << "): " << ::std::endl;
+    m_test_list.print_test_with_result(FAILED);
   }
 
 protected:
-  std::vector< std::pair< std::string, std::function<void ()> > > m_tests;
-  std::vector <std::string> m_passed_tests, m_failed_tests;
-  bool m_test_result;
+  void set_fail(::std::string func_name) {
+    std::cout << "Setting " << func_name << "failed" << std::endl;
+    m_test_list[func_name].result = FAILED; 
+  }
+protected:
+  test_list m_test_list;
 };
 
 } /* sc_test */ 
