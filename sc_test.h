@@ -20,10 +20,14 @@ enum result {UNKNOWN, PASSED, FAILED};
 #define ASSERT_EQ(val1, val2) if((val1) != (val2)) set_fail(__func__);
 
 #define EXPECT_DELAY(operation, time, unit) \
-  ::sc_core::sc_time __tmp = ::sc_core::sc_time_stamp();\
+  m_test_list[__func__].is_expired = true; \
+  m_test_list[__func__].expire_event.notify((time)*m_wait_expired_factor, (unit)); \
+  ::sc_core::sc_time __tmp = ::sc_core::sc_time_stamp(); \
   (operation);\
-  if (::sc_core::sc_time_stamp() - __tmp != ::sc_core::sc_time((time), (unit))) \
-    set_fail(__func__);
+  m_test_list[__func__].is_expired = false; \
+  if (::sc_core::sc_time_stamp() - __tmp != ::sc_core::sc_time((time), (unit))) { \
+    set_fail(__func__); \
+  }
 
 #define EXPECT_EXCEPTION(operation, exception_type) \
   try { \
@@ -37,16 +41,28 @@ struct test_helper {
   test_helper(::std::string n, ::std::function <void ()> f, result r):
     name(n), 
     func(f), 
-    result(r)
+    result(r),
+    is_expired(false)
   {;}
 
   void run() {
     func();
   }
 
+  test_helper(const test_helper& t):
+    name(t.name),
+    func(t.func),
+    result(t.result),
+    is_expired(t.is_expired)
+  {
+    ;
+  }
+
   ::std::string name;
   ::std::function <void ()> func;
   result result;
+  ::sc_core::sc_event expire_event;
+  bool is_expired;
 };
 
 struct test_list {
@@ -76,7 +92,7 @@ struct test_list {
   }
 
   void print_test_with_result(const result r) {
-    for (auto test: list) {
+    for (auto &test: list) {
       if (test.result == r) {
         ::std::cout << ::std::string("    ") << test.name << ::std::endl;
       }
@@ -95,7 +111,8 @@ class sc_testbench: ::sc_core::sc_module
 {
 public:
   sc_testbench(::sc_core::sc_module_name name):
-    ::sc_core::sc_module(name)
+    ::sc_core::sc_module(name),
+    m_wait_expired_factor(5)
   {
     SC_HAS_PROCESS(sc_testbench);
     SC_THREAD(run_tests); 
@@ -104,14 +121,19 @@ public:
   virtual void reset() = 0;
 
   void run_tests() {
-    for (auto test: m_test_list.list) {
+    for (auto &test: m_test_list.list) {
       reset(); 
       ::std::cout << "Testing: " << test.name<< "...";
 
       ::sc_core::sc_process_handle h = ::sc_core::sc_spawn(sc_bind(test.func));
-      wait(h.terminated_event());
+      wait(h.terminated_event() | test.expire_event);
 
-      if (test.result == PASSED) {
+      if( test.is_expired ) {
+        ::std::cout << "  FAILED..." << ::std::endl;
+        test.result = FAILED;
+      }
+
+      else if (test.result == PASSED) {
         ::std::cout << "  PASSED!" << ::std::endl;
       }
 
@@ -119,11 +141,11 @@ public:
         ::std::cout << "  FAILED..." << ::std::endl;
       }
 
+
       else {
         ::std::cout << "  Some problem occures..." << ::std::endl;
       }
     }
-    analysis();
   }
 
   void analysis() {
@@ -144,6 +166,7 @@ protected:
   }
 protected:
   test_list m_test_list;
+  int m_wait_expired_factor;
 };
 
 } /* sc_test */ 
