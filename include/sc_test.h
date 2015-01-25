@@ -17,22 +17,27 @@ enum result {UNKNOWN, PASSED, FAILED};
   sc_test::test_helper __t(#func, [=]{ return this->func(); }, sc_test::UNKNOWN); \
   m_test_list.list.push_back(__t);}
 
-#define ASSERT_EQ(val1, val2) if((val1) != (val2)) set_fail(__func__);
+#define ASSERT_EQ(val1, val2) if((val1) != (val2)) set_fail(__func__, __LINE__);
 
 #define EXPECT_DELAY(operation, time, unit) \
+{\
   m_test_list[__func__].is_expired = true; \
-  m_test_list[__func__].expire_event.notify((time)*m_wait_expired_factor, (unit)); \
-  ::sc_core::sc_time __tmp = ::sc_core::sc_time_stamp(); \
+  m_test_list[__func__].expire_event.notify((time+1)*m_wait_expired_factor, (unit)); \
+  set_fail(__func__, __LINE__); \
+  ::sc_core::sc_time __start_operation = ::sc_core::sc_time_stamp(); \
   (operation);\
   m_test_list[__func__].is_expired = false; \
-  if (::sc_core::sc_time_stamp() - __tmp != ::sc_core::sc_time((time), (unit))) { \
-    set_fail(__func__); \
-  }
+  m_test_list[__func__].expire_event.cancel();\
+  if (::sc_core::sc_time_stamp() - __start_operation== ::sc_core::sc_time((time), (unit))) { \
+    m_test_list[__func__].failed_lines.pop_back();\
+    m_test_list[__func__].result = sc_test::UNKNOWN;\
+  }\
+}
 
 #define EXPECT_EXCEPTION(operation, exception_type) \
   try { \
     (operation); \
-    set_fail(__func__); \
+    set_fail(__func__, __LINE__); \
   } catch (exception_type) {\
     ;\
   }
@@ -48,6 +53,7 @@ struct test_helper {
   result result;
   ::sc_core::sc_event expire_event;
   bool is_expired;
+  ::std::vector<int> failed_lines;
 };
 
 struct test_list {
@@ -73,7 +79,13 @@ struct test_list {
   void print_test_with_result(const result r) {
     for (auto &test: list) {
       if (test.result == r) {
-        ::std::cout << ::std::string("    ") << test.name << ::std::endl;
+        ::std::cout << ::std::string("    ") << test.name;
+        if (test.result != PASSED) {
+          ::std::cout << " -> line: ";
+          for (auto line: test.failed_lines) 
+            ::std::cout << line << " ,";
+        }
+        ::std::cout << ::std::endl;
       }
     }
   }
@@ -113,7 +125,7 @@ public:
 
       //update result
       if( test.is_expired ) {
-        ::std::cout << "  FAILED..." << ::std::endl;
+        ::std::cout << "  FAILED...(expired)" << ::std::endl;
         test.result = FAILED;
       }
       else if (test.result == UNKNOWN) {
@@ -133,6 +145,7 @@ public:
 
   void analysis() {
     ::std::cout << ::std::endl;
+    ::std::cout << ::std::endl;
     ::std::cout << "Total number of tests: " << m_test_list.num_total() << ::std::endl;
     ::std::cout << "Passed tests (" << m_test_list.num_with_result(PASSED) << "): " << ::std::endl;
     m_test_list.print_test_with_result(PASSED);
@@ -149,8 +162,9 @@ public:
 
 
 protected:
-  void set_fail(::std::string func_name) {
+  inline void set_fail(::std::string func_name, int failed_line) {
     m_test_list[func_name].result = FAILED; 
+    m_test_list[func_name].failed_lines.push_back(failed_line);
   }
 protected:
   test_list m_test_list;
