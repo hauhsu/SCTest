@@ -146,6 +146,12 @@ public:
   void analysis() {
     ::std::cout << ::std::endl;
     ::std::cout << ::std::endl;
+    if (m_test_list.num_total() == m_test_list.num_with_result(PASSED)) {
+      ::std::cout << " ------------------------------ " << ::std::endl;
+      ::std::cout << "|       ALL TESTS PASSED!!     |" << ::std::endl;
+      ::std::cout << " ------------------------------ " << ::std::endl;
+    }
+    ::std::cout << ::std::endl;
     ::std::cout << "Total number of tests: " << m_test_list.num_total() << ::std::endl;
     ::std::cout << "Passed tests (" << m_test_list.num_with_result(PASSED) << "): " << ::std::endl;
     m_test_list.print_test_with_result(PASSED);
