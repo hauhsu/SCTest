@@ -98,12 +98,13 @@ struct test_list {
 
 
 
-class sc_testbench: ::sc_core::sc_module
+class sc_testbench: public ::sc_core::sc_module
 {
 public:
   sc_testbench(::sc_core::sc_module_name name):
     ::sc_core::sc_module(name),
-    m_wait_expired_factor(5)
+    m_wait_expired_factor(5),
+    m_elaborated(false)
   {
     SC_HAS_PROCESS(sc_testbench);
     SC_THREAD(run_tests); 
@@ -111,6 +112,10 @@ public:
 
   ~sc_testbench() {
     analysis();
+  }
+
+  void end_of_elaboration() {
+    m_elaborated = true;
   }
 
   virtual void reset() = 0;
@@ -144,25 +149,29 @@ public:
   }
 
   void analysis() {
-    ::std::cout << ::std::endl;
-    ::std::cout << ::std::endl;
-    if (m_test_list.num_total() == m_test_list.num_with_result(PASSED)) {
-      ::std::cout << " ------------------------------ " << ::std::endl;
-      ::std::cout << "|       ALL TESTS PASSED!!     |" << ::std::endl;
-      ::std::cout << " ------------------------------ " << ::std::endl;
+    if (m_elaborated) {
+      ::std::cout << ::std::endl;
+      ::std::cout << ::std::endl;
+      if (m_test_list.num_total() == m_test_list.num_with_result(PASSED)) {
+        ::std::cout << " ------------------------------ " << ::std::endl;
+        ::std::cout << "|       ALL TESTS PASSED!!     |" << ::std::endl;
+        ::std::cout << " ------------------------------ " << ::std::endl;
+      }
+      ::std::cout << ::std::endl;
+      ::std::cout << "Total number of tests: " << m_test_list.num_total() << ::std::endl;
+      ::std::cout << "Passed tests (" << m_test_list.num_with_result(PASSED) << "): " << ::std::endl;
+      m_test_list.print_test_with_result(PASSED);
+
+      ::std::cout << ::std::endl;
+      ::std::cout << "Failed tests (" << m_test_list.num_with_result(FAILED) << "): " << ::std::endl;
+      m_test_list.print_test_with_result(FAILED);
+
+      ::std::cout << ::std::endl;
+      ::std::cout << "Not-finished tests (" << m_test_list.num_with_result(UNKNOWN) << "): " << ::std::endl;
+      m_test_list.print_test_with_result(UNKNOWN);
+    } else {
+      ::std::cout << "Elaboration failed.....\n";
     }
-    ::std::cout << ::std::endl;
-    ::std::cout << "Total number of tests: " << m_test_list.num_total() << ::std::endl;
-    ::std::cout << "Passed tests (" << m_test_list.num_with_result(PASSED) << "): " << ::std::endl;
-    m_test_list.print_test_with_result(PASSED);
-
-    ::std::cout << ::std::endl;
-    ::std::cout << "Failed tests (" << m_test_list.num_with_result(FAILED) << "): " << ::std::endl;
-    m_test_list.print_test_with_result(FAILED);
-
-    ::std::cout << ::std::endl;
-    ::std::cout << "Not-finished tests (" << m_test_list.num_with_result(UNKNOWN) << "): " << ::std::endl;
-    m_test_list.print_test_with_result(UNKNOWN);
   }
 
 
@@ -172,9 +181,11 @@ protected:
     m_test_list[func_name].result = FAILED; 
     m_test_list[func_name].failed_lines.push_back(failed_line);
   }
+
 protected:
   test_list m_test_list;
   int m_wait_expired_factor;
+  bool m_elaborated;
 };
 
 } /* sc_test */ 
