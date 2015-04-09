@@ -98,7 +98,7 @@ struct test_list {
 
 
 
-class sc_testbench: ::sc_core::sc_module
+class sc_testbench: public ::sc_core::sc_module
 {
 public:
   sc_testbench(::sc_core::sc_module_name name):
