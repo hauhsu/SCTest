@@ -38,8 +38,15 @@ enum result {UNKNOWN, PASSED, FAILED};
   try { \
     (operation); \
     set_fail(__func__, __LINE__); \
-  } catch (exception_type) {\
+  } catch (exception_type &e) {\
     ;\
+  }
+
+#define EXPECT_NO_EXCEPTION(operation) \
+  try { \
+    (operation); \
+  } catch (...) {\
+    set_fail(__func__, __LINE__); \
   }
 
 struct test_helper {
