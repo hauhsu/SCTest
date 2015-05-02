@@ -1,0 +1,7 @@
+# - Config file for the SCTest package
+# It defines the following variables
+#  SCTest_INCLUDE_DIRS - include directories for SCTest
+#  SCTest_LIBRARIES    - libraries to link
+
+set(SCTest_INCLUDE_DIRS @CMAKE_INSTALL_PREFIX@/include)
+set(SCTest_LIBRARIES @LIB_TARGET@)
