@@ -153,6 +153,7 @@ public:
         ::std::cout << "  Some problem occures..." << ::std::endl;
       }
     }
+    sc_core::sc_stop();
   }
 
   void analysis() {
