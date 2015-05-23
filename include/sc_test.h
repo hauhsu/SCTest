@@ -111,7 +111,8 @@ public:
   sc_testbench(::sc_core::sc_module_name name):
     ::sc_core::sc_module(name),
     m_wait_expired_factor(5),
-    m_elaborated(false)
+    m_elaborated(false),
+    m_first_test(true)
   {
     SC_HAS_PROCESS(sc_testbench);
     SC_THREAD(run_tests); 
@@ -129,7 +130,13 @@ public:
 
   void run_tests() {
     for (auto &test: m_test_list.list) {
-      reset(); 
+      if (m_first_test) {
+        //first test will not call "reset"
+        //so user can test the state after construction
+        m_first_test = false;
+      } else {
+        reset(); 
+      }
       ::std::cout << "Testing: " << test.name<< "...";
 
       ::sc_core::sc_process_handle h = ::sc_core::sc_spawn(sc_bind(test.func));
@@ -194,6 +201,7 @@ protected:
   test_list m_test_list;
   int m_wait_expired_factor;
   bool m_elaborated;
+  bool m_first_test;
 };
 
 } /* sc_test */ 
